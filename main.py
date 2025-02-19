@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5 import QtWidgets
 from frontend import Ui_MainWindow  
 import pandas as pd
+import re
 
 MAX = 1
 MIN = 0
@@ -47,6 +48,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         plot_item = self.plot_graph.getPlotItem()
 
+        # Habilita o grid nas direções X e Y
+        plot_item.showGrid(x=True, y=True)
+
+        # Define Titulos e cores dos eixos 
+        self.plot_graph.setBackground('w')
+        plot_item.setLabel('bottom', 'Tempo (min)', color='#151515')
+        plot_item.getAxis('bottom').setTextPen('#151515')
+        plot_item.getAxis('left').setTextPen('#151515')  
+
         # Signar of zoom change
         self.plot_graph.sigRangeChanged.connect(self.update_graph)
 
@@ -77,7 +87,98 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
     def fill_graph(self, type_column):
-        test = 0
+        valores_1 = []
+        valores_2 = []
+        valores_3 = []
+        valores_4 = []
+        valores_5 = []
+
+        self.plot_graph.clear()
+
+        for val in self.df[type_column]:
+
+            val_split = val.split()
+
+            # Compara o numero de elementos  
+            if len(val_split) == 5:
+                val1, val2, val3, val4, val5 = val_split
+                valores_1.append(float(re.sub(r'[a-zA-Z]+', '', val1).strip()))
+                valores_2.append(float(re.sub(r'[a-zA-Z]+', '', val2).strip()))
+                valores_3.append(float(re.sub(r'[a-zA-Z]+', '', val3).strip()))
+                valores_4.append(float(re.sub(r'[a-zA-Z]+', '', val4).strip()))
+                valores_5.append(float(re.sub(r'[a-zA-Z]+', '', val5).strip()))
+            elif len(val_split) == 3:
+                val1, val2, val3 = val_split
+                valores_1.append(float(re.sub(r'[a-zA-Z]+', '', val1).strip()))
+                valores_2.append(float(re.sub(r'[a-zA-Z]+', '', val2).strip()))
+                valores_3.append(float(re.sub(r'[a-zA-Z]+', '', val3).strip()))
+            elif len(val_split) == 2:
+                val1, val2 = val_split
+                valores_1.append(float(re.sub(r'[a-zA-Z]+', '', val1).strip()))
+                valores_2.append(float(re.sub(r'[a-zA-Z]+', '', val2).strip()))
+            else:
+                val1 = val_split
+                valores_1.append(float(re.sub(r'[a-zA-Z]+', '', val1[0]).strip()))
+
+
+        if len(val_split) == 5:
+            max_geral = max(max(valores_1), max(valores_2), max(valores_3), max(valores_4), max(valores_5))
+            min_geral = min(min(valores_1), min(valores_2), min(valores_3), min(valores_4), min(valores_5))
+        elif len(val_split) == 3:
+            max_geral = max(max(valores_1), max(valores_2), max(valores_3))
+            min_geral = min(min(valores_1), min(valores_2), min(valores_3))
+        elif len(val_split) == 2:
+            max_geral = max(max(valores_1), max(valores_2))
+            min_geral = min(min(valores_1), min(valores_2))
+        else:
+            max_geral = max(valores_1)
+            min_geral = min(valores_1)
+
+        ymax = (max_geral + (max_geral-min_geral)*2)
+        ymin = (min_geral - (max_geral-min_geral)*2)
+
+        if min_geral == 0.0:
+            ymin = 0.0
+            ymax = max_geral*1.5
+            if max_geral == 0.0:
+                ymin = - 1
+                ymax = 1
+
+        self.plot_graph.getViewBox().setLimits(yMin= ymin, yMax=ymax) 
+
+        # Criar e adicionar as linhas ao gráfico utilizando setData
+        if valores_5:
+            linha1 = self.plot_graph.plot(pen='r', name='Bateria')  # Linha vermelha
+            linha2 = self.plot_graph.plot(pen='g', name='PFC')  # Linha vermelha
+            linha3 = self.plot_graph.plot(pen='b', name='Inversor')  # Linha vermelha
+            linha4 = self.plot_graph.plot(pen='#9C00C3', name='Painel')  # Linha amarela
+            linha5 = self.plot_graph.plot(pen='c', name='Interno')  # Linha azul
+            linha1.setData(self.df['Hour_num'], valores_1)
+            linha2.setData(self.df['Hour_num'], valores_2)
+            linha3.setData(self.df['Hour_num'], valores_3)
+            linha4.setData(self.df['Hour_num'], valores_4)
+            linha5.setData(self.df['Hour_num'], valores_5)
+            self.plot_graph.setTitle("Temperatura", color='#151515')
+        elif valores_3:
+            linha1 = self.plot_graph.plot(pen='r', name='Fase A')  # Linha vermelha
+            linha2 = self.plot_graph.plot(pen='g', name='Fase B')  # Linha verde
+            linha3 = self.plot_graph.plot(pen='b', name='Fase C')  # Linha azul
+            linha1.setData(self.df['Hour_num'], valores_1)
+            linha2.setData(self.df['Hour_num'], valores_2)
+            linha3.setData(self.df['Hour_num'], valores_3)
+            self.plot_graph.setTitle(type_column, color='#151515')
+        elif valores_2:
+            linha1 = self.plot_graph.plot(pen='r', name='Positivo')  # Linha vermelha
+            linha2 = self.plot_graph.plot(pen='g', name='Negativo')  # Linha verde
+            linha1.setData(self.df['Hour_num'], valores_1)
+            linha2.setData(self.df['Hour_num'], valores_2)
+            self.plot_graph.setTitle(type_column, color='#151515')
+        else:
+            linha1 = self.plot_graph.plot(pen='r')  # Linha vermelha
+            linha1.setData(self.df['Hour_num'], valores_1)
+            self.plot_graph.setTitle(type_column, color='#151515')
+        
+        self.plot_graph.setRange(xRange=(0, MAX_REGISTERS), yRange=(ymin, ymax))
 
     def load_data(self):
 
